@@ -35,7 +35,7 @@ using namespace std;
 
 
 
-__global__ void kernel(int32_t *devPtr_pm, int32_t *devPtr_log_pr, int32_t *alpha, uint16_t *beta, int32_t p_max, int32_t *d_amax, unsigned int *d_jmax, int32_t *d_mutex, int ith_event, int32_t *d_temp_sum_pmax, int start_event, int end_event){
+__global__ void kernel(int32_t *devPtr_pm, int32_t *devPtr_log_pr, int32_t *alpha, uint16_t *beta, int32_t p_max, int32_t *d_amax, unsigned int *d_jmax, int32_t *d_mutex, int ith_event, int64_t *d_temp_sum_pmax, int start_event, int end_event){
 
 	unsigned id = threadIdx.x + blockIdx.x * threads_per_block;   //id is j from the serial code
 
@@ -139,6 +139,12 @@ for(int j=start_event; j<=end_event;j++){
 	__syncthreads();
 
 
+
+	if(j>7359){
+		if (threadIdx.x==0){
+			printf("i=%d and amax=%d\n",j, *d_amax);
+		}
+	}
 alpha_read=!alpha_read; alpha_write=!alpha_write;
 counter++;
 }
@@ -153,7 +159,7 @@ counter++;
 
 
 
-void preprocess_for_parallel(struct bcall_tcbk * fix, int32_t alpha[N_STATES], int32_t p_max, int i, int32_t * devPtr_pm, int32_t * devPtr_log_pr, int32_t * dev_alpha,  uint16_t *dev_beta, uint16_t *h_beta, int32_t *h_amax, int32_t *d_amax, unsigned int *h_jmax, unsigned int *d_jmax, int32_t *d_mutex, int32_t *h_temp_sum_pmax, int32_t *d_temp_sum_pmax  ){
+void preprocess_for_parallel(struct bcall_tcbk * fix, int32_t alpha[N_STATES], int32_t p_max, int i, int32_t * devPtr_pm, int32_t * devPtr_log_pr, int32_t * dev_alpha,  uint16_t *dev_beta, uint16_t *h_beta, int32_t *h_amax, int32_t *d_amax, unsigned int *h_jmax, unsigned int *d_jmax, int32_t *d_mutex, int64_t *h_temp_sum_pmax, int64_t *d_temp_sum_pmax  ){
 
 	struct fix_event * e;
 
@@ -166,11 +172,12 @@ void preprocess_for_parallel(struct bcall_tcbk * fix, int32_t alpha[N_STATES], i
 	}else if((start_event+number_of_events_per_kernel-1)<fix->n_events){
 		end_event=start_event+number_of_events_per_kernel-1;
 	}else{
-		end_event=fix->n_events-start_event-1;
+		end_event=fix->n_events-1;
 	}
 
 	const int number_of_events=end_event-start_event+1;
-	//cout<<"number_of_events="<<number_of_events<<endl;
+
+	//if (start_event>7359)	cout<<"start_event="<<start_event<<"    end_event= "<<end_event<<" number_of_events="<<number_of_events<<endl;
 
 	//event
 	int32_t event_host[4* number_of_events];
@@ -192,7 +199,7 @@ void preprocess_for_parallel(struct bcall_tcbk * fix, int32_t alpha[N_STATES], i
 	cudaMemset(d_mutex, 0, sizeof(int32_t));
 	
 	*h_temp_sum_pmax=0;
-	cudaMemset(d_temp_sum_pmax, 0, sizeof(int32_t));
+	cudaMemset(d_temp_sum_pmax, 0, sizeof(int64_t));
 
 
 	//copy event_host to constant memory
@@ -210,7 +217,7 @@ void preprocess_for_parallel(struct bcall_tcbk * fix, int32_t alpha[N_STATES], i
 	cudaMemcpy(h_beta,dev_beta, sizeof(uint16_t)*N_STATES*number_of_events, cudaMemcpyDeviceToHost);
 	cudaMemcpy(h_amax,d_amax, sizeof(int32_t), cudaMemcpyDeviceToHost);
 	cudaMemcpy(h_jmax,d_jmax, sizeof(int32_t), cudaMemcpyDeviceToHost);
-	cudaMemcpy(h_temp_sum_pmax,d_temp_sum_pmax, sizeof(int32_t), cudaMemcpyDeviceToHost);
+	cudaMemcpy(h_temp_sum_pmax,d_temp_sum_pmax, sizeof(int64_t), cudaMemcpyDeviceToHost);
 
 
 	
@@ -355,10 +362,10 @@ void tcbk_sequence_fill(struct bcall_tcbk * fix)
 	int32_t *d_mutex;
 	cudaMalloc((void**)&d_mutex, sizeof(int32_t));
 
-	int32_t *h_temp_sum_pmax;
-	h_temp_sum_pmax = (int32_t*)malloc(sizeof(int32_t)); //host
-	int32_t *d_temp_sum_pmax;
-	cudaMalloc((void**)&d_temp_sum_pmax, sizeof(int32_t));//device
+	int64_t *h_temp_sum_pmax;
+	h_temp_sum_pmax = (int64_t*)malloc(sizeof(int64_t)); //host
+	int64_t *d_temp_sum_pmax;
+	cudaMalloc((void**)&d_temp_sum_pmax, sizeof(int64_t));//device
 	//--------------------------------------------------------------------------
 	//--------------------------------------------------------------------------
 	//--------------------------------------------------------------------------
@@ -381,7 +388,7 @@ void tcbk_sequence_fill(struct bcall_tcbk * fix)
 		p_max = a_max;
 
 
-		if (i<5) cout<<"i= "<<i<<"   a_max= "<<a_max<< " *h_temp_sum_pmax= "<<*h_temp_sum_pmax<<endl;
+		//if (i>7359) cout<<"i= "<<i<<"   a_max= "<<a_max<< " *h_temp_sum_pmax= "<<*h_temp_sum_pmax<<endl;
 		fix->sum_log_p_max += *h_temp_sum_pmax; //a_max;
 		
 	
