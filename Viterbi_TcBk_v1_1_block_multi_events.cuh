@@ -140,11 +140,11 @@ for(int j=start_event; j<=end_event;j++){
 
 
 
-	if(j>7359){
+	/*if(j>7359){
 		if (threadIdx.x==0){
 			printf("i=%d and amax=%d\n",j, *d_amax);
 		}
-	}
+	}*/
 alpha_read=!alpha_read; alpha_write=!alpha_write;
 counter++;
 }
